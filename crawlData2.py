@@ -4,7 +4,7 @@ import re
 from bs4 import BeautifulSoup
 
 myclient = pymongo.MongoClient('mongodb://localhost:27017/')
-mydb = myclient['colearn_textbook1']
+mydb = myclient['colearn_textbook']
 colAnswers = mydb["answers"]
 colCategories = mydb["categories"]
 
@@ -13,8 +13,12 @@ urlBase = "https://vietjack.com/"
 def crawlInEx(url, parent):
     print(url)
     response = requests.get(url)
-    soup = BeautifulSoup(response.content, "html.parser")
-    checkExist = soup.find('b', attrs={"style": "color:green;"}, string=lambda text: "lời giải" in text.lower())
+    soup = BeautifulSoup(response.content, "html5lib")
+    soup.prettify(formatter="html5")
+    # print(soup)
+    checkExist1 = soup.find('b', attrs={"style": "color:green;"}, string=lambda text: "lời giải" in text.lower())
+    checkExist2 = soup.find('b', attrs={"style": "color:green;"}, string=lambda text: "trả lời" in text.lower())
+    checkExist = checkExist1 or checkExist2
     if checkExist != None:
         question = soup.find('b', attrs={"style": "color:green;"})
         name = question.parent.text
@@ -23,6 +27,8 @@ def crawlInEx(url, parent):
         while temp.next_element.name != 'b':
             if temp.name == 'p':
                 name += '\n' + temp.text
+            if temp.name == 'img':
+                name += urlBase + temp.get('src')[2:] + '\n'
             temp = temp.next_sibling
         print(name)
         print('------------')
@@ -30,14 +36,11 @@ def crawlInEx(url, parent):
         content = ''
 
         while temp.next_sibling.name != 'ul':
-            print(temp.next_sibling.name)
-            print("NCT")
-            if temp.name == 'p':
+            if temp.name == 'p' and temp.find(string=lambda text: "giải bài tập" in text.lower()) == None:
                 content += temp.text + '\n'
             if temp.name == 'img':
                 content += urlBase + temp.get('src')[2:] + '\n'
             temp = temp.next_sibling
-
         print(content)
         colCategories.insert_one({'parent_id': parent['_id'], 'name': name, 'has_sub_category': 0})
         category_id = colCategories.find_one({'name': name})
@@ -76,7 +79,7 @@ def crawlInSubject(url):
                 crawlInUnit(urlBase + unit.find('a').get('href')[2:], parent)
 
 
-crawlInSubject("https://vietjack.com/giai-hoa-lop-12/index.jsp")
+crawlInSubject("https://vietjack.com/giai-bai-tap-hoa-12-nang-cao/index.jsp")
 # crawlInUnit("https://vietjack.com//lich-su-6-ket-noi/bai-16-cac-cuoc-khoi-nghia-tieu-bieu-gianh-doc-lap-truoc-the-ki-x.jsp", '111')
 # crawlInEx("https://vietjack.com//lich-su-6-ket-noi/cau-hoi-mo-dau-trang-70-bai-16-lich-su-lop-6-ket-noi-tri-thuc.jsp", '111')
 
